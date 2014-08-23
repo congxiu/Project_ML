@@ -1,0 +1,71 @@
+---
+title: "Project_ML"
+author: "CX"
+date: "August 21, 2014"
+output: html_document
+---
+#Summary
+This report is on fitting a model to predict the class of pml data. We choose a random forest algorithm based on our features, and achieved 99.93% OOB accuracy rate. 
+
+#Data Pre-processing
+
+```{r read data, cache = TRUE}
+testing <- read.csv('./pml-testing.csv')
+training <- read.csv('./pml-training.csv')
+```
+
+When we take a look at the data, we see that there are a lot of summary statistics columns. For example, the mean of roll belt for each window number of each test subject. These summary statistics are mostly NA, and we don't really have a value of any summary statistics when given a new test sample, so we simply delete these features.
+
+```{r clearning}
+training[, grep('kurtosis|skewness|max|min|amplitude|avg|var|stddev', names(training))] <- data.frame(NULL)
+testing[, grep('kurtosis|skewness|max|min|amplitude|avg|var|stddev', names(testing))] <- data.frame(NULL)
+training <- training[ , -c(1, 5, 6)]
+testing <- testing[ , -c(1, 5, 6)]
+```
+
+Column 'X' is just the number of the observation, it does not contain useful information. Column 'new\_window' indicates a change of window and the apperance of summary statistics, it is of no use to us. Column 'cvtd_timestamp' is just a human readable translation of raw timestamp, and is redundent for machine. After we delete the above columns, we have our 57 features dataset.
+
+```{r features}
+names(training)
+```
+
+If we use methods which take only numerical variables as input, say, a SVM, we would need to transform "user_name" to numerical variable and scale all of the numbers to get a better performence. Here we choose a random forest algorithm, and can thus put aside all of those scaling and non-numerical variable issues.
+
+#Train and CV
+
+The following code requires 'randomForest' package.
+
+```{r training, cache = TRUE}
+library(randomForest)
+set.seed(12541)
+fit <- randomForest(classe ~ ., training)
+```
+
+Random forest does its own OOB(out of bag) error estimate, which is essentially cross validation, and we don't have to do it manually. For more reference, check out the OOB error estimate section of [this article](http://www.stat.berkeley.edu/~breiman/RandomForests/cc_home.htm#ooberr). When we take a look at our model:
+
+```{r model}
+fit
+```
+
+We have 99.93% OOB accuracy, which is just our CV accuracy. We therefore expect the out of sample accuracy to be close, perhaps 99%. 
+
+#Prediction
+
+Make prediction
+
+```{r prediction}
+answers <- predict(fit, testing)
+```
+
+And then write files.
+
+```{r write files}
+pml_write_files = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0("problem_id_",i,".txt")
+    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+pml_write_files(answers)
+```
