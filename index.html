@@ -1,0 +1,174 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <title>Project ml by congxiu</title>
+
+    <link rel="stylesheet" href="stylesheets/styles.css">
+    <link rel="stylesheet" href="stylesheets/pygment_trac.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+  </head>
+  <body>
+    <div class="wrapper">
+      <header>
+        <h1>Project ml</h1>
+        <p></p>
+
+        <p class="view"><a href="https://github.com/congxiu/Project_ML">View the Project on GitHub <small>congxiu/Project_ML</small></a></p>
+
+
+        <ul>
+          <li><a href="https://github.com/congxiu/Project_ML/zipball/master">Download <strong>ZIP File</strong></a></li>
+          <li><a href="https://github.com/congxiu/Project_ML/tarball/master">Download <strong>TAR Ball</strong></a></li>
+          <li><a href="https://github.com/congxiu/Project_ML">View On <strong>GitHub</strong></a></li>
+        </ul>
+      </header>
+      <section>
+        <p>&lt;!DOCTYPE html&gt;</p>
+
+<p></p>
+
+<p></p>
+
+<p></p>
+
+<p></p>
+
+<p></p>
+
+<p></p>Project_ML<p></p>
+
+code{white-space: pre;}<p></p>
+
+
+  pre:not([class]) {
+    background-color: white;
+  }
+<p></p>
+
+<p></p>
+
+
+.main-container {
+  max-width: 940px;
+  margin-left: auto;
+  margin-right: auto;
+}
+<div>
+
+
+<div>
+<h1>
+<a name="project_ml" class="anchor" href="#project_ml"><span class="octicon octicon-link"></span></a>Project_ML</h1>
+<h4>
+<a name="cx" class="anchor" href="#cx"><span class="octicon octicon-link"></span></a><em>CX</em>
+</h4>
+<h4>
+<a name="august-21-2014" class="anchor" href="#august-21-2014"><span class="octicon octicon-link"></span></a><em>August 21, 2014</em>
+</h4>
+</div>
+
+<div>
+<h1>
+<a name="summary" class="anchor" href="#summary"><span class="octicon octicon-link"></span></a>Summary</h1>
+<p>This report is on fitting a model to predict the class of pml data. We choose a random forest algorithm based on our features, and achieved 99.93% OOB accuracy rate.</p>
+</div>
+
+<div>
+<h1>
+<a name="data-pre-processing" class="anchor" href="#data-pre-processing"><span class="octicon octicon-link"></span></a>Data Pre-processing</h1>
+<pre><code>testing &lt;- read.csv('./pml-testing.csv')
+training &lt;- read.csv('./pml-training.csv')</code></pre>
+<p>When we take a look at the data, we see that there are a lot of summary statistics columns. For example, the mean of roll belt for each window number of each test subject. These summary statistics are mostly NA, and we don’t really have a value of any summary statistics when given a new test sample, so we simply delete these features.</p>
+<pre><code>training[, grep('kurtosis|skewness|max|min|amplitude|avg|var|stddev', names(training))] &lt;- data.frame(NULL)
+testing[, grep('kurtosis|skewness|max|min|amplitude|avg|var|stddev', names(testing))] &lt;- data.frame(NULL)
+training &lt;- training[ , -c(1, 5, 6)]
+testing &lt;- testing[ , -c(1, 5, 6)]</code></pre>
+<p>Column ‘X’ is just the number of the observation, it does not contain useful information. Column ‘new_window’ indicates a change of window and the apperance of summary statistics, it is of no use to us. Column ‘cvtd_timestamp’ is just a human readable translation of raw timestamp, and is redundent for machine. After we delete the above columns, we have our 57 features dataset.</p>
+<pre><code>names(training)</code></pre>
+<pre><code>##  [1] "user_name"            "raw_timestamp_part_1" "raw_timestamp_part_2"
+##  [4] "num_window"           "roll_belt"            "pitch_belt"          
+##  [7] "yaw_belt"             "total_accel_belt"     "gyros_belt_x"        
+## [10] "gyros_belt_y"         "gyros_belt_z"         "accel_belt_x"        
+## [13] "accel_belt_y"         "accel_belt_z"         "magnet_belt_x"       
+## [16] "magnet_belt_y"        "magnet_belt_z"        "roll_arm"            
+## [19] "pitch_arm"            "yaw_arm"              "total_accel_arm"     
+## [22] "gyros_arm_x"          "gyros_arm_y"          "gyros_arm_z"         
+## [25] "accel_arm_x"          "accel_arm_y"          "accel_arm_z"         
+## [28] "magnet_arm_x"         "magnet_arm_y"         "magnet_arm_z"        
+## [31] "roll_dumbbell"        "pitch_dumbbell"       "yaw_dumbbell"        
+## [34] "total_accel_dumbbell" "gyros_dumbbell_x"     "gyros_dumbbell_y"    
+## [37] "gyros_dumbbell_z"     "accel_dumbbell_x"     "accel_dumbbell_y"    
+## [40] "accel_dumbbell_z"     "magnet_dumbbell_x"    "magnet_dumbbell_y"   
+## [43] "magnet_dumbbell_z"    "roll_forearm"         "pitch_forearm"       
+## [46] "yaw_forearm"          "total_accel_forearm"  "gyros_forearm_x"     
+## [49] "gyros_forearm_y"      "gyros_forearm_z"      "accel_forearm_x"     
+## [52] "accel_forearm_y"      "accel_forearm_z"      "magnet_forearm_x"    
+## [55] "magnet_forearm_y"     "magnet_forearm_z"     "classe"</code></pre>
+<p>If we use methods which take only numerical variables as input, say, a SVM, we would need to transform “user_name” to numerical variable and scale all of the numbers to get a better performence. Here we choose a random forest algorithm, and can thus put aside all of those scaling and non-numerical variable issues.</p>
+</div>
+
+<div>
+<h1>
+<a name="train-and-cv" class="anchor" href="#train-and-cv"><span class="octicon octicon-link"></span></a>Train and CV</h1>
+<p>The following code requires ‘randomForest’ package.</p>
+<pre><code>library(randomForest)</code></pre>
+<pre><code>## randomForest 4.6-10
+## Type rfNews() to see new features/changes/bug fixes.</code></pre>
+<pre><code>set.seed(12541)
+fit &lt;- randomForest(classe ~ ., training)</code></pre>
+<p>Random forest does its own OOB(out of bag) error estimate, which is essentially cross validation, and we don’t have to do it manually. For more reference, check out the OOB error estimate section of <a href="http://www.stat.berkeley.edu/~breiman/RandomForests/cc_home.htm#ooberr">this article</a>. When we take a look at our model:</p>
+<pre><code>fit</code></pre>
+<pre><code>## 
+## Call:
+##  randomForest(formula = classe ~ ., data = training) 
+##                Type of random forest: classification
+##                      Number of trees: 500
+## No. of variables tried at each split: 7
+## 
+##         OOB estimate of  error rate: 0.07%
+## Confusion matrix:
+##      A    B    C    D    E class.error
+## A 5580    0    0    0    0   0.0000000
+## B    2 3795    0    0    0   0.0005267
+## C    0    4 3418    0    0   0.0011689
+## D    0    0    5 3210    1   0.0018657
+## E    0    0    0    1 3606   0.0002772</code></pre>
+<p>We have 99.93% OOB accuracy, which is just our CV accuracy. We therefore expect the out of sample accuracy to be close, perhaps 99%.</p>
+</div>
+
+<div>
+<h1>
+<a name="prediction" class="anchor" href="#prediction"><span class="octicon octicon-link"></span></a>Prediction</h1>
+<p>Make prediction</p>
+<pre><code>answers &lt;- predict(fit, testing)</code></pre>
+<p>And then write files.</p>
+<pre><code>pml_write_files = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0("problem_id_",i,".txt")
+    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+pml_write_files(answers)</code></pre>
+</div>
+
+<p></p>
+</div>
+
+<p>
+</p>
+      </section>
+      <footer>
+        <p>This project is maintained by <a href="https://github.com/congxiu">congxiu</a></p>
+        <p><small>Hosted on GitHub Pages &mdash; Theme by <a href="https://github.com/orderedlist">orderedlist</a></small></p>
+      </footer>
+    </div>
+    <script src="javascripts/scale.fix.js"></script>
+    
+  </body>
+</html>
